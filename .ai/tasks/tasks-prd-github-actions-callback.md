@@ -13,7 +13,12 @@
 
 
 - [ ] 1.0 Design the plugin architecture and configuration
-  - [ ] 1.1 Review Ansible callback plugin API and requirements for 2.16+
+- [x] 1.1 Review Ansible callback plugin API and requirements for 2.16+
+  - Ansible callback plugins are Python modules placed in a callback_plugins directory or installed as packages. For 2.16+, plugins must define a class inheriting from `CallbackBase` in `ansible.plugins.callback`.
+  - Required methods include `v2_playbook_on_start`, `v2_playbook_on_play_start`, `v2_playbook_on_task_start`, `v2_runner_on_ok`, `v2_runner_on_failed`, `v2_runner_on_skipped`, and `v2_playbook_on_stats`.
+  - Plugins must set `CALLBACK_VERSION = 2.0` and `CALLBACK_TYPE = 'stdout'`.
+  - Configuration is typically handled via environment variables or Ansible config files, accessible via `self.get_option()`.
+  - Output should be written using `self._display.display()` for proper integration with Ansible's output system.
   - [ ] 1.2 Define configuration options (verbosity, archive filename)
   - [ ] 1.3 Plan data structures for tracking play/task results and summary statistics
 
