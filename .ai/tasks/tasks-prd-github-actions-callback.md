@@ -30,8 +30,14 @@
   - At the end of the run, aggregate counts for summary statistics grouped by play and host.
 
 - [ ] 2.0 Implement minimal, grouped output for GitHub Actions
-  - [ ] 2.1 Implement output of filename, play name, hostname, status message, and task name per task
-  - [ ] 2.2 Add grouping by play and task using `::group::` and `::endgroup::` markers
+- [x] 2.1 Implement output of filename, play name, hostname, status message, and task name per task
+  - For each task event (`v2_runner_on_ok`, `v2_runner_on_failed`, etc.), extract filename, play name, hostname, status, and task name from the event data.
+  - Format output as a single line per task, e.g.: `filename | play_name | hostname | status | task_name`
+  - Use `self._display.display()` to emit the formatted line to stdout.
+  - Store each output line in the archive data structure for later file writing.
+- [x] 2.2 Add grouping by play and task using `::group::` and `::endgroup::` markers
+  - Implemented in `github_actions.py`: output uses `::group::Play: ...` and `::group::Task: ...` at the start of each play/task, and `::endgroup::` after each task for GitHub UI folding.
+  - Archive lines also include group markers for later file writing.
   - [ ] 2.3 Ensure output is concise and fits GitHub Actions UI constraints
 
 - [ ] 3.0 Map Ansible status messages to GitHub Actions log levels
