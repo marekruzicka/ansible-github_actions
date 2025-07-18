@@ -23,7 +23,11 @@
   - Verbosity: Boolean option to enable detailed fail messages. Can be set via Ansible config or environment variable (e.g., `github_actions_verbose`).
   - Archive filename: String option to specify the output file for archiving all plugin output, including summary. Configurable via Ansible config or environment variable (e.g., `github_actions_archive_file`).
   - Both options should be accessible via `self.get_option()` in the plugin.
-  - [ ] 1.3 Plan data structures for tracking play/task results and summary statistics
+- [x] 1.3 Plan data structures for tracking play/task results and summary statistics
+  - Use a nested dictionary structure: `{play_name: {host: {status_counts: {ok, changed, failed, skipped}, tasks: [task_info]}}}`
+  - `task_info` is a dict with keys: filename, play name, hostname, status, task name, and (optionally) fail details.
+  - Maintain a list for ordered output and grouping markers.
+  - At the end of the run, aggregate counts for summary statistics grouped by play and host.
 
 - [ ] 2.0 Implement minimal, grouped output for GitHub Actions
   - [ ] 2.1 Implement output of filename, play name, hostname, status message, and task name per task
