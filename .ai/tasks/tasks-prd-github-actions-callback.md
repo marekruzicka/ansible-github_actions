@@ -19,7 +19,10 @@
   - Plugins must set `CALLBACK_VERSION = 2.0` and `CALLBACK_TYPE = 'stdout'`.
   - Configuration is typically handled via environment variables or Ansible config files, accessible via `self.get_option()`.
   - Output should be written using `self._display.display()` for proper integration with Ansible's output system.
-  - [ ] 1.2 Define configuration options (verbosity, archive filename)
+- [x] 1.2 Define configuration options (verbosity, archive filename)
+  - Verbosity: Boolean option to enable detailed fail messages. Can be set via Ansible config or environment variable (e.g., `github_actions_verbose`).
+  - Archive filename: String option to specify the output file for archiving all plugin output, including summary. Configurable via Ansible config or environment variable (e.g., `github_actions_archive_file`).
+  - Both options should be accessible via `self.get_option()` in the plugin.
   - [ ] 1.3 Plan data structures for tracking play/task results and summary statistics
 
 - [ ] 2.0 Implement minimal, grouped output for GitHub Actions
