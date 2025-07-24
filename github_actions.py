@@ -73,8 +73,8 @@ class CallbackModule(CallbackBase):
         
         task_name = task.get_name().strip()
         self._current_task = task_name
-        self._display.display(f"::group::Task: {task_name}")
-        self.archive_lines.append(f"::group::Task: {task_name}")
+        self._display.display(f"::group::{task_name}")
+        self.archive_lines.append(f"::group::{task_name}")
         self._task_group_open = True
 
     def v2_runner_on_ok(self, result):
@@ -165,17 +165,22 @@ class CallbackModule(CallbackBase):
             play_name = self._current_play or ''
             hostname = result._host.get_name() if hasattr(result, '_host') and result._host else 'unknown'
             task_name = self._current_task or ''
-            marker = ''
+            
+            # Format: filename | hostname | status | play_name | task_name
+            line = f"{filename} | {hostname} | {status} | {play_name} | {task_name}"
+            
+            # Apply GitHub Actions status marker
             if status == 'ok':
-                marker = '::notice::'
+                output_line = f"::notice::{line}"
             elif status == 'changed':
-                marker = '::warning::'
+                output_line = f"::warning::{line}"
             elif status == 'failed':
-                marker = '::error::'
-            # For other statuses, no marker or custom marker can be added if needed
-            line = f"{marker}{filename} | {hostname} | {status} | {play_name} | {task_name}"
-            self._display.display(line)
-            self.archive_lines.append(line)
+                output_line = f"::error::{line}"
+            else:
+                output_line = line
+                
+            self._display.display(output_line)
+            self.archive_lines.append(output_line)
         except Exception as e:
             # Fallback error message
             error_line = f"::error::Failed to format task line: {str(e)}"
