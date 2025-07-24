@@ -1,69 +1,33 @@
 ## Relevant Files
 
-- `github_actions.py` - Main Ansible callback plugin implementing GitHub Actions-compatible output, grouping, and summary statistics.
-- `test_github_actions.py` - Unit tests for the callback plugin, covering output formatting, grouping, summary, and error handling.
-- `README.md` - Documentation for plugin usage, configuration, and integration with GitHub Actions workflows.
+- `github_actions.py` - Main callback plugin implementation for GitHub Actions output formatting.
+- `test_github_actions.py` - Unit tests for the callback plugin.
 
 ### Notes
 
-- Unit tests should be placed alongside the code files they are testing (e.g., `github_actions.py` and `test_github_actions.py` in the same directory).
-- Use `pytest test_github_actions.py` to run tests. Running without a path executes all tests found by the pytest configuration.
+- Unit tests should be placed alongside the main plugin file.
+- Use `python -m pytest test_github_actions.py -v` to run tests.
+- The plugin must be compatible with Ansible 2.16+ callback API.
 
 ## Tasks
 
-
-- [ ] 1.0 Design the plugin architecture and configuration
-- [x] 1.1 Review Ansible callback plugin API and requirements for 2.16+
-  - Ansible callback plugins are Python modules placed in a callback_plugins directory or installed as packages. For 2.16+, plugins must define a class inheriting from `CallbackBase` in `ansible.plugins.callback`.
-  - Required methods include `v2_playbook_on_start`, `v2_playbook_on_play_start`, `v2_playbook_on_task_start`, `v2_runner_on_ok`, `v2_runner_on_failed`, `v2_runner_on_skipped`, and `v2_playbook_on_stats`.
-  - Plugins must set `CALLBACK_VERSION = 2.0` and `CALLBACK_TYPE = 'stdout'`.
-  - Configuration is typically handled via environment variables or Ansible config files, accessible via `self.get_option()`.
-  - Output should be written using `self._display.display()` for proper integration with Ansible's output system.
-- [x] 1.2 Define configuration options (verbosity, archive filename)
-  - Verbosity: Boolean option to enable detailed fail messages. Can be set via Ansible config or environment variable (e.g., `github_actions_verbose`).
-  - Archive filename: String option to specify the output file for archiving all plugin output, including summary. Configurable via Ansible config or environment variable (e.g., `github_actions_archive_file`).
-  - Both options should be accessible via `self.get_option()` in the plugin.
-- [x] 1.3 Plan data structures for tracking play/task results and summary statistics
-  - Use a nested dictionary structure: `{play_name: {host: {status_counts: {ok, changed, failed, skipped}, tasks: [task_info]}}}`
-  - `task_info` is a dict with keys: filename, play name, hostname, status, task name, and (optionally) fail details.
-  - Maintain a list for ordered output and grouping markers.
-  - At the end of the run, aggregate counts for summary statistics grouped by play and host.
-
-- [ ] 2.0 Implement minimal, grouped output for GitHub Actions
-- [x] 2.1 Implement output of filename, play name, hostname, status message, and task name per task
-  - For each task event (`v2_runner_on_ok`, `v2_runner_on_failed`, etc.), extract filename, play name, hostname, status, and task name from the event data.
-  - Format output as a single line per task, e.g.: `filename | play_name | hostname | status | task_name`
-  - Use `self._display.display()` to emit the formatted line to stdout.
-  - Store each output line in the archive data structure for later file writing.
-- [x] 2.2 Add grouping by play and task using `::group::` and `::endgroup::` markers
-  - Implemented in `github_actions.py`: output uses `::group::Play: ...` and `::group::Task: ...` at the start of each play/task, and `::endgroup::` after each task for GitHub UI folding.
-  - Archive lines also include group markers for later file writing.
-  - [ ] 2.3 Ensure output is concise and fits GitHub Actions UI constraints
-
-- [ ] 3.0 Map Ansible status messages to GitHub Actions log levels
-  - [ ] 3.1 Map 'ok' to 'notice', 'changed' to 'warning', 'failed' to 'error', and handle other statuses
-  - [ ] 3.2 Test log level mapping for all supported status types
-
-- [ ] 4.0 Implement summary statistics output (plain text)
-  - [ ] 4.1 Track counts of ok, changed, failed, and skipped tasks, grouped by play and host
-  - [ ] 4.2 Format and output summary statistics at the end of the run
-
-- [ ] 5.0 Support writing all output to a plain text archive file
-  - [ ] 5.1 Implement file writing logic for all output, including summary
-  - [ ] 5.2 Make archive filename configurable
-  - [ ] 5.3 Handle file I/O errors gracefully
-
-- [ ] 6.0 Add configuration for verbosity and error handling
-  - [ ] 6.1 Implement verbosity option to show detailed fail messages
-  - [ ] 6.2 Ensure plugin does not crash on unexpected errors
-  - [ ] 6.3 Add error handling for plugin logic and output formatting
-
-- [ ] 7.0 Write unit tests for plugin functionality
-  - [ ] 7.1 Test output formatting for all status types and grouping
-  - [ ] 7.2 Test summary statistics output
-  - [ ] 7.3 Test archive file writing and error handling
-  - [ ] 7.4 Test configuration options (verbosity, filename)
-
-- [ ] 8.0 Document plugin usage and configuration
-  - [ ] 8.1 Write usage instructions for the plugin in `README.md`
-  - [ ] 8.2 Document configuration options and integration steps for GitHub Actions
+- [x] 1.0 Implement missing status handlers and fix group management
+  - [x] 1.1 Add v2_runner_on_changed method to handle changed status
+  - [x] 1.2 Fix group management to properly open/close play and task groups
+  - [x] 1.3 Update _emit_task_line to handle 'changed' status mapping
+- [x] 2.0 Add configuration support for verbosity and archive file output
+  - [x] 2.1 Add callback plugin configuration options (verbose, archive_file)
+  - [x] 2.2 Implement configuration parsing in __init__ method
+  - [x] 2.3 Add verbose error message output for failed tasks
+- [x] 3.0 Implement statistics tracking and summary output
+  - [x] 3.1 Add statistics tracking data structures (counters by play/host)
+  - [x] 3.2 Update task result handlers to increment counters
+  - [x] 3.3 Implement summary output in v2_playbook_on_stats method
+- [x] 4.0 Add archive file functionality with configurable filename
+  - [x] 4.1 Implement archive file writing functionality
+  - [x] 4.2 Add archive file configuration and default filename
+  - [x] 4.3 Write summary statistics to archive file
+- [x] 5.0 Enhance error handling and verbose error output
+  - [x] 5.1 Add graceful error handling for missing attributes
+  - [x] 5.2 Implement detailed error output when verbose mode is enabled
+  - [x] 5.3 Add error handling for file I/O operations

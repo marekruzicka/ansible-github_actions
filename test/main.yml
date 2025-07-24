@@ -1,0 +1,14 @@
+---
+- name: Test stdout_callback plugin
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Print a simple message
+      debug:
+        msg: "Hello from stdout_callback test!"
+    
+    - name: Print a message with a variable
+      vars:
+        my_variable: "This is a variable message."
+      debug:
+        msg: "{{ my_variable }}"  

@@ -1,0 +1,6 @@
+{
+  "ansibug.interpreterPath": "/home/marek/.venv/ansible_2.16.14/bin/python3",
+  "path-intellisense.absolutePathToWorkspace": false,
+  "ansible.python.interpreterPath": "/home/marek/.venv/ansible_2.16.14/bin/python3",
+  "ansible.validation.lint.enabled": false
+}

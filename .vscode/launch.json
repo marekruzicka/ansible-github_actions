@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "ansible",
+      "name": "Debug ansible playbook",
+      "request": "launch",
+      // "playbook": "${file}",          // the .yml you have open
+      "cwd": "${workspaceFolder}",
+      "playbook": "main.yml",
+      "args": ["-i", "inventory", "-t", "report", "-e" , "@/tmp/data_gather.tmp/data_index.json"],
+      "env": { 
+        "ANSIBLE_CONFIG": "${workspaceFolder}/ansible.cfg",
+        "VIRTUAL_ENV": "/home/marek/.venv/ansible_2.16.14",
+        "PATH": "${VIRTUAL_ENV}/bin:${env:PATH}"
+      },
+      "pathMappings": [
+        // {
+        //   "remoteRoot": "${env:HOME}/.ansible/collections/ansible_collections/dhl",
+        //   "localRoot":  "${workspaceFolder}"
+        // }
+      ],
+      "logLevel": "info"              // or "debug" for adapter logs
+    }
+  ]
+}
