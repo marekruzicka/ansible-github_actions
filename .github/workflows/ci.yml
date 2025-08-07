@@ -1,0 +1,109 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, '3.10', '3.11', '3.12']
+        ansible-version: ['2.16.*', '2.17.*', '2.18.*']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install Ansible ${{ matrix.ansible-version }}
+      run: |
+        python -m pip install --upgrade pip
+        pip install ansible==${{ matrix.ansible-version }}
+        pip install pytest
+
+    - name: Validate plugin imports
+      run: |
+        python -c "from github_actions import CallbackModule; print('✅ Plugin imports successfully')"
+
+    - name: Run unit tests
+      run: |
+        cd test
+        python -m pytest test_github_actions.py -v
+
+    - name: Test live execution (single host)
+      run: |
+        cd test
+        ansible-playbook -i 127.0.0.1, main.yml
+
+    - name: Test live execution (multiple hosts)
+      run: |
+        cd test
+        ansible-playbook -i 127.0.0.1,127.0.0.2, main.yml
+
+    - name: Test different grouping modes
+      run: |
+        cd test
+        GITHUB_ACTIONS_GROUPING=play ansible-playbook -i 127.0.0.1,127.0.0.2, main.yml
+        GITHUB_ACTIONS_GROUPING=task ansible-playbook -i 127.0.0.1, main.yml
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install pylint flake8 black
+
+    - name: Run linting
+      run: |
+        black --check github_actions.py
+        flake8 github_actions.py
+        pylint github_actions.py
+
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Ansible
+      run: |
+        python -m pip install --upgrade pip
+        pip install ansible
+
+    - name: Test GitHub Actions integration
+      run: |
+        cd test
+        # This will generate actual GitHub Actions formatted output
+        export GITHUB_ACTIONS_GROUPING=smart
+        export GITHUB_ACTIONS_VERBOSE=true
+        ./run_tests.sh
+
+    - name: Validate output format
+      run: |
+        cd test
+        # Check that the output contains expected GitHub Actions commands
+        if [ -f /tmp/ansible_test_output.log ]; then
+          grep -q "::group::" /tmp/ansible_test_output.log || exit 1
+          grep -q "::notice::" /tmp/ansible_test_output.log || exit 1
+          grep -q "::endgroup::" /tmp/ansible_test_output.log || exit 1
+          echo "✅ GitHub Actions formatting validated"
+        fi

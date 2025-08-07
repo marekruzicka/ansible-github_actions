@@ -1,6 +1,9 @@
 import unittest
 import tempfile
 import os
+import sys
+# Add parent directory to path to import the callback module
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from github_actions import CallbackModule
 
 class TestGithubActionsCallback(unittest.TestCase):
@@ -69,6 +72,19 @@ class TestGithubActionsCallback(unittest.TestCase):
         self.assertNotIn('::warning::', self.plugin.archive_lines[-1])
         self.assertNotIn('::error::', self.plugin.archive_lines[-1])
 
+    def test_unreachable_status_output(self):
+        """Test unreachable status shows ::error:: prefix"""
+        result = type('Result', (), {
+            '_task': type('Task', (), {'get_path': lambda self: 'playbook.yml'})(),
+            '_host': type('Host', (), {'get_name': lambda self: 'unreachable_host'})(),
+        })()
+        self.plugin._current_play = 'TestPlay'
+        self.plugin._current_task = 'TestTask'
+        self.plugin._emit_task_line(result, status='unreachable')
+        self.assertIn('::error::', self.plugin.archive_lines[-1])
+        self.assertIn('unreachable_host', self.plugin.archive_lines[-1])
+        self.assertIn('unreachable', self.plugin.archive_lines[-1])
+
     def test_statistics_tracking(self):
         result = type('Result', (), {
             '_task': type('Task', (), {'get_path': lambda self: 'playbook.yml'})(),
@@ -134,18 +150,43 @@ class TestGithubActionsCallback(unittest.TestCase):
         self.assertTrue(self.plugin._play_group_open)
 
     def test_smart_grouping_multiple_hosts(self):
-        """Test smart grouping with multiple hosts (should group by task)"""
+        """Test smart grouping with multiple hosts (should start with play, then switch to task)"""
         self.plugin.grouping_mode = 'smart'
         
-        # Mock play with multiple hosts
+        # Mock play
         play = type('Play', (), {
             'get_name': lambda self: 'Test Play',
             'get_hosts': lambda self: ['host1', 'host2', 'host3']
         })()
         
+        # Start the play - should initially use play grouping
         self.plugin.v2_playbook_on_play_start(play)
+        self.assertEqual(self.plugin.current_grouping, 'play')
+        self.assertTrue(self.plugin._play_group_open)
+        
+        # Start a task
+        task = type('Task', (), {
+            'get_name': lambda self: 'Test Task',
+            'get_path': lambda self: 'test.yml'
+        })()
+        self.plugin.v2_playbook_on_task_start(task, False)
+        
+        # Simulate first host execution - should stay in play mode
+        result1 = type('Result', (), {
+            '_task': task,
+            '_host': type('Host', (), {'get_name': lambda self: 'host1'})(),
+        })()
+        self.plugin._emit_task_line(result1, 'ok')
+        self.assertEqual(self.plugin.current_grouping, 'play')
+        
+        # Simulate second host execution - should switch to task mode
+        result2 = type('Result', (), {
+            '_task': task,
+            '_host': type('Host', (), {'get_name': lambda self: 'host2'})(),
+        })()
+        self.plugin._emit_task_line(result2, 'ok')
         self.assertEqual(self.plugin.current_grouping, 'task')
-        self.assertFalse(self.plugin._play_group_open)
+        self.assertTrue(self.plugin._smart_grouping_decided)
 
     def test_forced_play_grouping(self):
         """Test forced play grouping mode"""

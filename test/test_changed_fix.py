@@ -3,6 +3,11 @@
 Test script to verify the changed detection fix
 """
 
+import os
+import sys
+# Add parent directory to path to import the callback module
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from github_actions import CallbackModule
 
 class MockDisplay:

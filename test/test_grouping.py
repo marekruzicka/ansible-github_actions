@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """
-Test script to demonstrate the adaptive grouping functionality
+Test script for adaptive grouping functionality
 """
 
-from github_actions import CallbackModule
+import os
 import sys
+# Add parent directory to path to import the callback module
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from github_actions import CallbackModule
 
 class MockDisplay:
     def __init__(self):

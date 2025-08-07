@@ -1,14 +1,53 @@
 ---
-- name: Test stdout_callback plugin
-  hosts: localhost
-  gather_facts: false
+# GitHub Actions Callback Plugin Test Playbook
+# This playbook demonstrates smart grouping behavior:
+# - Single host: groups by play
+# - Multiple hosts: groups by task for better GitHub Actions UI
+
+- name: GitHub Actions Smart Grouping Demo
+  hosts: all
+  gather_facts: true
+  vars:
+    demo_message: "Smart grouping demonstration"
+  
   tasks:
-    - name: Print a simple message
+    - name: "Task 1: Display welcome message"
       debug:
-        msg: "Hello from stdout_callback test!"
-    
-    - name: Print a message with a variable
-      vars:
-        my_variable: "This is a variable message."
+        msg: |
+          Welcome to {{ demo_message }}!
+          Running on host: {{ inventory_hostname }}
+          Ansible version: {{ ansible_version.full }}
+
+    - name: "Task 2: Create a temporary file"
+      copy:
+        content: |
+          Host: {{ inventory_hostname }}
+          Timestamp: {{ ansible_date_time.iso8601 }}
+          Message: {{ demo_message }}
+        dest: "/tmp/ansible_test_{{ inventory_hostname }}.txt"
+      register: file_creation
+
+    - name: "Task 3: Show file creation result"
       debug:
-        msg: "{{ my_variable }}"  
+        msg: "File created: {{ file_creation.dest }} (changed: {{ file_creation.changed }})"
+
+    - name: "Task 4: Test conditional task (will be skipped)"
+      debug:
+        msg: "This task will be skipped"
+      when: false
+
+    - name: "Task 5: Test failure handling (commented out)"
+      debug:
+        msg: "This task would fail if uncommented"
+      # Uncomment the next line to test error handling:
+      # fail:
+      #   msg: "Simulated failure for testing"
+
+    - name: "Task 6: Final summary"
+      debug:
+        msg: |
+          Summary for {{ inventory_hostname }}:
+          - Smart grouping is active
+          - Single host = play grouping
+          - Multiple hosts = task grouping
+          - Check GitHub Actions logs to see the grouping behavior!  
