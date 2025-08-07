@@ -119,5 +119,59 @@ class TestGithubActionsCallback(unittest.TestCase):
         error_lines = [line for line in self.plugin.archive_lines if 'Error details' in line]
         self.assertEqual(len(error_lines), 1)
 
+    def test_smart_grouping_single_host(self):
+        """Test smart grouping with single host (should group by play)"""
+        self.plugin.grouping_mode = 'smart'
+        
+        # Mock play with single host
+        play = type('Play', (), {
+            'get_name': lambda self: 'Test Play',
+            'get_hosts': lambda self: ['host1']
+        })()
+        
+        self.plugin.v2_playbook_on_play_start(play)
+        self.assertEqual(self.plugin.current_grouping, 'play')
+        self.assertTrue(self.plugin._play_group_open)
+
+    def test_smart_grouping_multiple_hosts(self):
+        """Test smart grouping with multiple hosts (should group by task)"""
+        self.plugin.grouping_mode = 'smart'
+        
+        # Mock play with multiple hosts
+        play = type('Play', (), {
+            'get_name': lambda self: 'Test Play',
+            'get_hosts': lambda self: ['host1', 'host2', 'host3']
+        })()
+        
+        self.plugin.v2_playbook_on_play_start(play)
+        self.assertEqual(self.plugin.current_grouping, 'task')
+        self.assertFalse(self.plugin._play_group_open)
+
+    def test_forced_play_grouping(self):
+        """Test forced play grouping mode"""
+        self.plugin.grouping_mode = 'play'
+        
+        play = type('Play', (), {
+            'get_name': lambda self: 'Test Play',
+            'get_hosts': lambda self: ['host1', 'host2']
+        })()
+        
+        self.plugin.v2_playbook_on_play_start(play)
+        self.assertEqual(self.plugin.current_grouping, 'play')
+        self.assertTrue(self.plugin._play_group_open)
+
+    def test_forced_task_grouping(self):
+        """Test forced task grouping mode"""
+        self.plugin.grouping_mode = 'task'
+        
+        play = type('Play', (), {
+            'get_name': lambda self: 'Test Play',
+            'get_hosts': lambda self: ['host1']
+        })()
+        
+        self.plugin.v2_playbook_on_play_start(play)
+        self.assertEqual(self.plugin.current_grouping, 'task')
+        self.assertFalse(self.plugin._play_group_open)
+
 if __name__ == '__main__':
     unittest.main()

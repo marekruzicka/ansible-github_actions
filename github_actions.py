@@ -13,7 +13,8 @@ CALLBACK_NAME = 'github_actions'
 # Default configuration options
 DEFAULT_CONFIG = {
     'verbose': False,
-    'archive_file': 'ansible-github-actions.log'
+    'archive_file': 'ansible-github-actions.log',
+    'grouping': 'smart'  # smart, play, task
 }
 
 class CallbackModule(CallbackBase):
@@ -30,6 +31,10 @@ class CallbackModule(CallbackBase):
         self._task_group_open = False
         self.archive_lines = []
         
+        # Grouping strategy
+        self.grouping_mode = 'smart'  # Will be determined per play for smart mode
+        self.current_grouping = None  # 'play' or 'task' for current execution
+        
         # Statistics tracking
         self.stats = {
             'plays': {},  # play_name: {host: {ok: 0, changed: 0, failed: 0, skipped: 0, unreachable: 0}}
@@ -40,42 +45,67 @@ class CallbackModule(CallbackBase):
         try:
             self.verbose = self.get_option('verbose')
             self.archive_file = self.get_option('archive_file')
+            self.grouping_mode = self.get_option('grouping')
         except:
             self.verbose = DEFAULT_CONFIG['verbose']
             self.archive_file = DEFAULT_CONFIG['archive_file']
+            self.grouping_mode = DEFAULT_CONFIG['grouping']
 
     def set_options(self, task_keys=None, var_options=None, direct=None):
         super(CallbackModule, self).set_options(task_keys=task_keys, var_options=var_options, direct=direct)
         try:
             self.verbose = self.get_option('verbose')
             self.archive_file = self.get_option('archive_file')
+            self.grouping_mode = self.get_option('grouping')
         except:
             self.verbose = DEFAULT_CONFIG['verbose']
             self.archive_file = DEFAULT_CONFIG['archive_file']
+            self.grouping_mode = DEFAULT_CONFIG['grouping']
 
     def v2_playbook_on_play_start(self, play):
         # Close previous play group if open
         if self._play_group_open:
             self._display.display("::endgroup::")
             self.archive_lines.append("::endgroup::")
+            self._play_group_open = False
         
         play_name = play.get_name().strip()
         self._current_play = play_name
-        self._display.display(f"::group::Play: {play_name}")
-        self.archive_lines.append(f"::group::Play: {play_name}")
-        self._play_group_open = True
+        
+        # Determine grouping strategy for this play
+        if self.grouping_mode == 'smart':
+            # Count hosts in this play
+            host_count = len(play.get_hosts()) if hasattr(play, 'get_hosts') else 1
+            self.current_grouping = 'play' if host_count == 1 else 'task'
+        elif self.grouping_mode == 'play':
+            self.current_grouping = 'play'
+        elif self.grouping_mode == 'task':
+            self.current_grouping = 'task'
+        else:
+            # Fallback to task grouping for unknown modes
+            self.current_grouping = 'task'
+        
+        # Start play group only if grouping by play
+        if self.current_grouping == 'play':
+            self._display.display(f"::group::Play: {play_name}")
+            self.archive_lines.append(f"::group::Play: {play_name}")
+            self._play_group_open = True
 
     def v2_playbook_on_task_start(self, task, is_conditional):
         # Close previous task group if open
         if self._task_group_open:
             self._display.display("::endgroup::")
             self.archive_lines.append("::endgroup::")
+            self._task_group_open = False
         
         task_name = task.get_name().strip()
         self._current_task = task_name
-        self._display.display(f"::group::{task_name}")
-        self.archive_lines.append(f"::group::{task_name}")
-        self._task_group_open = True
+        
+        # Start task group only if grouping by task
+        if self.current_grouping == 'task':
+            self._display.display(f"::group::{task_name}")
+            self.archive_lines.append(f"::group::{task_name}")
+            self._task_group_open = True
 
     def v2_runner_on_ok(self, result):
         # Check if this is actually a changed result reported as ok
@@ -141,6 +171,13 @@ class CallbackModule(CallbackBase):
         summary_line = f"Total: {self.stats['totals']['ok']} ok, {self.stats['totals']['changed']} changed, {self.stats['totals']['failed']} failed, {self.stats['totals']['skipped']} skipped, {self.stats['totals']['unreachable']} unreachable"
         self._display.display(summary_line)
         self.archive_lines.append(summary_line)
+        
+        # Show grouping mode info
+        mode_info = f"Grouping mode: {self.grouping_mode}"
+        if self.grouping_mode == 'smart':
+            mode_info += f" (using {self.current_grouping} grouping)"
+        self._display.display(mode_info)
+        self.archive_lines.append(mode_info)
         
         # Per-play breakdown
         for play_name, play_stats in self.stats['plays'].items():
