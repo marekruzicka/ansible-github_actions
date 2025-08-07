@@ -78,8 +78,18 @@ class CallbackModule(CallbackBase):
         self._task_group_open = True
 
     def v2_runner_on_ok(self, result):
-        self._emit_task_line(result, status='ok')
-        self._update_stats(result, 'ok')
+        # Check if this is actually a changed result reported as ok
+        actual_status = 'ok'
+        if hasattr(result, '_result') and result._result:
+            if result._result.get('changed', False):
+                actual_status = 'changed'
+                self._update_stats(result, 'changed')
+            else:
+                self._update_stats(result, 'ok')
+        else:
+            self._update_stats(result, 'ok')
+        
+        self._emit_task_line(result, status=actual_status)
 
     def v2_runner_on_changed(self, result):
         self._emit_task_line(result, status='changed')
@@ -165,6 +175,14 @@ class CallbackModule(CallbackBase):
             play_name = self._current_play or ''
             hostname = result._host.get_name() if hasattr(result, '_host') and result._host else 'unknown'
             task_name = self._current_task or ''
+            
+            # Debug: Check for changed flag in verbose mode
+            if self.verbose and hasattr(result, '_result') and result._result:
+                changed_flag = result._result.get('changed', False)
+                if changed_flag and status == 'ok':
+                    debug_line = f"::notice::DEBUG: Task reported changed=true but status=ok for {task_name}"
+                    self._display.display(debug_line)
+                    self.archive_lines.append(debug_line)
             
             # Format: filename | hostname | status | play_name | task_name
             line = f"{filename} | {hostname} | {status} | {play_name} | {task_name}"

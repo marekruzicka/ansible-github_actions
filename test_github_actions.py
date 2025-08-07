@@ -18,14 +18,33 @@ class TestGithubActionsCallback(unittest.TestCase):
         self.plugin._emit_task_line(result, status='ok')
         self.assertIn('::notice::', self.plugin.archive_lines[-1])
 
-    def test_changed_status_output(self):
+    def test_changed_detection_in_ok_result(self):
+        """Test that changed=true in result is detected even when reported as 'ok'"""
+        result = type('Result', (), {
+            '_task': type('Task', (), {'get_path': lambda self: 'playbook.yml'})(),
+            '_host': type('Host', (), {'get_name': lambda self: 'localhost'})(),
+            '_result': {'changed': True}  # This should trigger changed status
+        })()
+        self.plugin._current_play = 'TestPlay'
+        self.plugin._current_task = 'TestTask'
+        
+        # Simulate what happens when Ansible reports changed as 'ok'
+        self.plugin.v2_runner_on_ok(result)
+        
+        # Should have detected the change and marked as warning
+        self.assertIn('::warning::', self.plugin.archive_lines[-1])
+        self.assertEqual(self.plugin.stats['totals']['changed'], 1)
+        self.assertEqual(self.plugin.stats['totals']['ok'], 0)
+
+    def test_direct_changed_status_output(self):
+        """Test direct v2_runner_on_changed method"""
         result = type('Result', (), {
             '_task': type('Task', (), {'get_path': lambda self: 'playbook.yml'})(),
             '_host': type('Host', (), {'get_name': lambda self: 'localhost'})(),
         })()
         self.plugin._current_play = 'TestPlay'
         self.plugin._current_task = 'TestTask'
-        self.plugin._emit_task_line(result, status='changed')
+        self.plugin.v2_runner_on_changed(result)
         self.assertIn('::warning::', self.plugin.archive_lines[-1])
 
     def test_failed_status_output(self):
