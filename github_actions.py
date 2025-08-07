@@ -25,31 +25,23 @@ class CallbackModule(CallbackBase):
     
     def __init__(self):
         super(CallbackModule, self).__init__()
-        self._current_play = None
-        self._current_task = None
+        self.archive_lines = []
+        self.stats = {
+            'totals': {'ok': 0, 'changed': 0, 'failed': 0, 'skipped': 0, 'unreachable': 0},
+            'plays': {}
+        }
         self._play_group_open = False
         self._task_group_open = False
-        self.archive_lines = []
+        self._current_play = None
+        self._current_task = None
+        self._seen_hosts = set()  # Track hosts we've seen for smart grouping
+        self._smart_grouping_decided = False  # Whether we've decided on grouping for current play
         
-        # Grouping strategy
-        self.grouping_mode = 'smart'  # Will be determined per play for smart mode
-        self.current_grouping = None  # 'play' or 'task' for current execution
-        
-        # Statistics tracking
-        self.stats = {
-            'plays': {},  # play_name: {host: {ok: 0, changed: 0, failed: 0, skipped: 0, unreachable: 0}}
-            'totals': {'ok': 0, 'changed': 0, 'failed': 0, 'skipped': 0, 'unreachable': 0}
-        }
-        
-        # Configuration options with fallbacks
-        try:
-            self.verbose = self.get_option('verbose')
-            self.archive_file = self.get_option('archive_file')
-            self.grouping_mode = self.get_option('grouping')
-        except:
-            self.verbose = DEFAULT_CONFIG['verbose']
-            self.archive_file = DEFAULT_CONFIG['archive_file']
-            self.grouping_mode = DEFAULT_CONFIG['grouping']
+        # Initialize with defaults (will be overridden by set_options if called)
+        self.verbose = DEFAULT_CONFIG['verbose']
+        self.archive_file = DEFAULT_CONFIG['archive_file']
+        self.grouping_mode = DEFAULT_CONFIG['grouping']
+        self.current_grouping = self.grouping_mode  # Set initial grouping
 
     def set_options(self, task_keys=None, var_options=None, direct=None):
         super(CallbackModule, self).set_options(task_keys=task_keys, var_options=var_options, direct=direct)
@@ -57,10 +49,12 @@ class CallbackModule(CallbackBase):
             self.verbose = self.get_option('verbose')
             self.archive_file = self.get_option('archive_file')
             self.grouping_mode = self.get_option('grouping')
+            self.current_grouping = self.grouping_mode  # Initialize current grouping
         except:
             self.verbose = DEFAULT_CONFIG['verbose']
             self.archive_file = DEFAULT_CONFIG['archive_file']
             self.grouping_mode = DEFAULT_CONFIG['grouping']
+            self.current_grouping = self.grouping_mode  # Initialize current grouping
 
     def v2_playbook_on_play_start(self, play):
         # Close previous play group if open
@@ -71,12 +65,12 @@ class CallbackModule(CallbackBase):
         
         play_name = play.get_name().strip()
         self._current_play = play_name
+        self._seen_hosts.clear()  # Reset for new play
+        self._smart_grouping_decided = False  # Reset decision for new play
         
-        # Determine grouping strategy for this play
+        # For smart mode, we'll initially assume single host and adjust when needed
         if self.grouping_mode == 'smart':
-            # Count hosts in this play
-            host_count = len(play.get_hosts()) if hasattr(play, 'get_hosts') else 1
-            self.current_grouping = 'play' if host_count == 1 else 'task'
+            self.current_grouping = 'play'  # Start with play grouping
         elif self.grouping_mode == 'play':
             self.current_grouping = 'play'
         elif self.grouping_mode == 'task':
@@ -212,6 +206,34 @@ class CallbackModule(CallbackBase):
             play_name = self._current_play or ''
             hostname = result._host.get_name() if hasattr(result, '_host') and result._host else 'unknown'
             task_name = self._current_task or ''
+            
+            # Track hosts for smart grouping
+            if self.grouping_mode == 'smart' and not self._smart_grouping_decided:
+                self._seen_hosts.add(hostname)
+                
+                # If we see a second host and we're still in play mode, switch to task mode
+                if len(self._seen_hosts) > 1 and self.current_grouping == 'play':
+                    # Close the current play group
+                    if self._play_group_open:
+                        self._display.display("::endgroup::")
+                        self.archive_lines.append("::endgroup::")
+                        self._play_group_open = False
+                    
+                    # Switch to task grouping
+                    self.current_grouping = 'task'
+                    self._smart_grouping_decided = True
+                    
+                    # Debug output when verbose mode is enabled
+                    if self.verbose:
+                        debug_msg = f"::notice::Smart grouping: switching to task grouping (detected {len(self._seen_hosts)} hosts)"
+                        self._display.display(debug_msg)
+                        self.archive_lines.append(debug_msg)
+                    
+                    # Start task group for current task if we have one
+                    if self._current_task and not self._task_group_open:
+                        self._display.display(f"::group::{self._current_task}")
+                        self.archive_lines.append(f"::group::{self._current_task}")
+                        self._task_group_open = True
             
             # Debug: Check for changed flag in verbose mode
             if self.verbose and hasattr(result, '_result') and result._result:
