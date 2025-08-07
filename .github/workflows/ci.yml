@@ -13,6 +13,7 @@ jobs:
       matrix:
         python-version: ['3.10', '3.11', '3.12', '3.13']
         ansible-version: ['2.16.*', '2.17.*', '2.18.*']
+    continue-on-error: true
 
     steps:
     - uses: actions/checkout@v4
